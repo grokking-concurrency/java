@@ -242,3 +242,236 @@ Sender: Send: ' '
 Sender: Send: 'world!'
 Receiver: Received: 'Hello world!'
 ```
+
+# Mission D: Thread Pool
+### Description
+Implement the Python code below in Java
+
+### Python Code
+```python
+#!/usr/bin/env python3.9
+
+"""Simple thread pool implementation"""
+
+import time
+import queue
+import typing as T
+from threading import Thread, current_thread
+
+Callback = T.Callable[..., None]
+Task = T.Tuple[Callback, T.Any, T.Any]
+TaskQueue = queue.Queue
+
+
+class Worker(Thread):
+    """Thread executing tasks from a given tasks queue"""
+    def __init__(self, tasks: queue.Queue[Task]):
+        super().__init__()
+        self.tasks = tasks
+
+    def run(self) -> None:
+        # running the thread indefinitely
+        while True:
+            # getting the tasks from queue and execute
+            func, args, kargs = self.tasks.get()
+            try:
+                func(*args, **kargs)
+            except Exception as e:
+                print(e)
+            self.tasks.task_done()
+
+
+class ThreadPool:
+    """Pool of threads consuming tasks from a queue"""
+    def __init__(self, num_threads: int):
+        # setting up the queue to put tasks
+        self.tasks: TaskQueue = queue.Queue(num_threads)
+        self.num_threads = num_threads
+
+        # create long-running threads
+        for _ in range(self.num_threads):
+            worker = Worker(self.tasks)
+            worker.setDaemon(True)
+            worker.start()
+
+    def submit(self, func: Callback, *args, **kargs) -> None:
+        """Add a task to the queue"""
+        self.tasks.put((func, args, kargs))
+
+    def wait_completion(self) -> None:
+        """Wait for completion of all the tasks in the queue"""
+        # join method that blocks the main thread until the child
+        # threads has finished
+        self.tasks.join()
+
+
+def cpu_waster(i: int) -> None:
+    """Wasting the processor time, professionally"""
+    name = current_thread().getName()
+    print(f"{name} doing {i} work")
+    time.sleep(3)
+
+
+def main() -> None:
+    pool = ThreadPool(num_threads=5)
+    for i in range(20):
+        pool.submit(cpu_waster, i)
+
+    print("All work requests sent")
+    pool.wait_completion()
+    print("All work completed")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+### Sample Output
+```
+Thread-2 doing 1 work
+Thread-5 doing 2 work
+Thread-1 doing 3 work
+Thread-3 doing 4 work
+Thread-4 doing 0 work
+Thread-2 doing 5 work
+Thread-5 doing 6 work
+Thread-1 doing 7 work
+Thread-4 doing 9 work
+Thread-3 doing 8 work
+Thread-2 doing 10 work
+Thread-5 doing 11 work
+Thread-1 doing 12 work
+Thread-4 doing 13 work
+Thread-3 doing 14 work
+All work requests sent
+Thread-2 doing 15 work
+Thread-5 doing 16 work
+Thread-1 doing 17 work
+Thread-3 doing 18 work
+Thread-4 doing 19 work
+All work completed
+```
+
+
+# Mission E: Password Crack
+### Description
+Implement the Python code below in Java
+
+### Python Code
+```python
+#!/usr/bin/env python3.9
+
+"""Program for cracking the password consisting of only numbers using multi
+cores in parallel"""
+
+import os
+import math
+import time
+import typing as T
+import hashlib
+from multiprocessing import Pool
+
+ChunkRange = T.Tuple[int, int]
+
+
+def get_combinations(*, length: int, min_number: int = 0, max_number: int = None) -> T.List[str]:
+    """Generate all possible password combinations"""
+    combinations = []
+    if not max_number:
+        # calculating maximum number based on the length
+        max_number = int(math.pow(10, length) - 1)
+
+    # go through all possible combinations in a given range
+    for i in range(min_number, max_number + 1):
+        str_num = str(i)
+        # fill in the missing numbers with zeros
+        zeros = "0" * (length - len(str_num))
+        combinations.append("".join((zeros, str_num)))
+    return combinations
+
+
+def get_crypto_hash(password: str) -> str:
+    """"Calculating cryptographic hash of the password"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def check_password(expected_crypto_hash: str,
+                   possible_password: str) -> bool:
+    actual_crypto_hash = get_crypto_hash(possible_password)
+    # compare the resulted cryptographic hash with the one stored on the system
+    return expected_crypto_hash == actual_crypto_hash
+
+
+def get_chunks(num_ranges: int,
+               length: int) -> T.Iterator[ChunkRange]:
+    """Splitting the passwords into chunks using break points"""
+    max_number = int(math.pow(10, length) - 1)
+    chunk_starts = [int(max_number / num_ranges * i)
+                    for i in range(num_ranges)]
+    chunk_ends = [start_point - 1
+                  for start_point in
+                  chunk_starts[1:]] + [max_number]
+    return zip(chunk_starts, chunk_ends)
+
+
+def crack_chunk(crypto_hash: str, length: int, chunk_start: int,
+                chunk_end: int) -> T.Union[str, None]:
+    """Brute force the password combinations"""
+    print(f"Processing {chunk_start} to {chunk_end}")
+    combinations = get_combinations(length=length, min_number=chunk_start,
+                                    max_number=chunk_end)
+    for combination in combinations:
+        if check_password(crypto_hash, combination):
+            return combination  # found it
+    return  # not found
+
+
+def crack_password_parallel(crypto_hash: str, length: int) -> None:
+    """Orchestrate cracking the password between different processes"""
+    # getting number of available processors
+    num_cores = os.cpu_count()
+    print("Processing number combinations concurrently")
+    start_time = time.perf_counter()
+
+    # processing each chunk in a separate process concurrently
+    with Pool() as pool:
+        arguments = ((crypto_hash, length, chunk_start, chunk_end) for
+                     chunk_start, chunk_end in
+                     get_chunks(num_cores, length))
+        results = pool.starmap(crack_chunk, arguments)
+        print("Waiting for chunks to finish")
+        pool.close()
+        pool.join()
+
+    result = [res for res in results if res]
+    print(f"PASSWORD CRACKED: {result[0]}")
+    process_time = time.perf_counter() - start_time
+    print(f"PROCESS TIME: {process_time}")
+
+
+if __name__ == "__main__":
+    crypto_hash = \
+        "e24df920078c3dd4e7e8d2442f00e5c9ab2a231bb3918d65cc50906e49ecaef4"
+    length = 8
+    crack_password_parallel(crypto_hash, length)
+```
+
+### Sample Output
+```
+Processing number combinations concurrently
+Processing 0 to 8333332
+Processing 8333333 to 16666665
+Processing 16666666 to 24999998
+Processing 24999999 to 33333332
+Processing 33333333 to 41666665
+Processing 41666666 to 49999998
+Processing 49999999 to 58333331
+Processing 58333332 to 66666665
+Processing 66666666 to 74999998
+Processing 74999999 to 83333331
+Processing 83333332 to 91666664
+Processing 91666665 to 99999999
+Waiting for chunks to finish
+PASSWORD CRACKED: 87654321
+PROCESS TIME: 16.330762699999998
+```
