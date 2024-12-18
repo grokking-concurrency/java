@@ -1,4 +1,4 @@
-package chatper04;
+package chapter04;
 
 public class MissionA {
 
