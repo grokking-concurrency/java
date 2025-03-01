@@ -4,7 +4,7 @@
 
 - [그로킹 동시성(길벗)] 책을 학습하며 파이썬 예제를 자바로 구현하는 방식으로 스터디를 진행했습니다.
 - 원본 Repository: [https://github.com/gilbutITbook/080403](https://github.com/gilbutITbook/080403)
-- Github Wiki : https://github.com/grokking-concurrency/java/wiki
+- Wiki : https://github.com/grokking-concurrency/java/wiki
 
 # 👨‍💻 스터디 참가자 
 
